@@ -53,6 +53,96 @@ python3 bot_with_lang_choice.py
  2. Отправить текст: apple
  3. Бот переведет на русский язык и покажет синонимы на английском
 
+код бота
+
+from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
+from deep_translator import GoogleTranslator
+from langdetect import detect
+from nltk.corpus import wordnet
+import nltk
+import random
+
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+# Определение направления перевода
+def detect_language(text):
+    lang = detect(text)
+    if lang == 'ru':
+        return 'russian', 'english'
+    else:
+        return 'english', 'russian'
+
+# Получение синонимов для английского (через WordNet)
+def get_english_synonyms(word):
+    synonyms = set()
+    for syn in wordnet.synsets(word):
+        for lemma in syn.lemmas():
+            name = lemma.name().replace('_', ' ')
+            if name.lower() != word.lower():
+                synonyms.add(name)
+    return list(synonyms)
+
+# Заглушка: синонимы на русском (можно подключить Yandex Dictionary API)
+def get_russian_synonyms(word):
+    # Для полноценных синонимов можно использовать Яндекс Словарь API
+    # Здесь просто примеры
+    simple_synonyms = {
+        "большой": ["огромный", "громадный", "великий"],
+        "маленький": ["крошечный", "небольшой", "миниатюрный"]
+    }
+    return simple_synonyms.get(word.lower(), [])
+
+# Обработка текста: перевод и синонимы
+async def process(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    from_lang, to_lang = detect_language(text)
+
+    try:
+        translated = GoogleTranslator(source=from_lang, target=to_lang).translate(text)
+        reply = f"**Перевод** ({from_lang} → {to_lang}):\n{translated}"
+
+        # Если короткое сообщение (одно слово) — предложим синонимы
+        if len(text.split()) == 1:
+            word = text.strip()
+            if from_lang == 'english':
+                synonyms = get_english_synonyms(word)
+            else:
+                synonyms = get_russian_synonyms(word)
+            if synonyms:
+                reply += f"\n\nСинонимы для «{word}»:\n• " + "\n• ".join(synonyms)
+            else:
+                reply += "\n\nСинонимы не найдены."
+
+        await update.message.reply_text(reply)
+
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка: {e}")
+
+# Команда /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Привет! Я — переводчик и помощник по синонимам.\n"
+        "Просто отправь слово или фразу, и я:\n"
+        "- переведу с русского на английский и наоборот\n"
+        "- покажу синонимы, если это одно слово"
+    )
+
+# Запуск бота
+def main():
+    TOKEN = '7866119149:AAHRCZub7EfYRB9BhSc45VN7lN1rZojRRVY'
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process))
+
+    print("Бот запущен. Ожидаю сообщения...")
+    app.run_polling()
+
+if name == "__main__":
+    main()
+
 Автор проекта
 
 ФИО: (Чанышева Зарина, Дамбаева Валерия, Мироненко Карина,Евлантьева Анастасия, Капапперо Аллета)
